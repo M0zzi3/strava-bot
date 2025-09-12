@@ -24,7 +24,7 @@ def get_access_token():
 def get_recent_activities(access_token):
     url = "https://www.strava.com/api/v3/athlete/activities"
     headers = {"Authorization": f"Bearer {access_token}"}
-    params = {"per_page": 10}  # Get last 10
+    params = {"per_page": 10}  # Get last 10 activities
     r = requests.get(url, headers=headers, params=params)
     r.raise_for_status()
     return r.json()
@@ -55,16 +55,18 @@ def main():
     last_id = read_last_id()
     new_last_id = last_id
 
+    muted_activities = []
+
     for activity in activities:
         activity_id = activity["id"]
 
-        # Skip if activity was already precessed
+        # Skip if activity was already processed
         if activity_id <= last_id:
             continue
 
         if activity["type"] == "Ride" and not activity.get("muted", False):
-            print(f"Muting activity {activity_id} ({activity['name']})")
             mute_activity(access_token, activity_id)
+            muted_activities.append(f"{activity_id} ({activity['name']})")
 
         # Set new latest ID
         if activity_id > new_last_id:
@@ -74,7 +76,14 @@ def main():
     if new_last_id > last_id:
         write_last_id(new_last_id)
 
+    # Logging summary
+    if muted_activities:
+        print("Muted the following activities:")
+        for act in muted_activities:
+            print(f" - {act}")
+    else:
+        print("No new bike activities to mute.")
+
 
 if __name__ == "__main__":
     main()
-
