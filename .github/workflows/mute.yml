@@ -2,14 +2,15 @@ name: Auto-Mute Strava Rides
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
-  workflow_dispatch:
+    - cron: "*/30 * * * *" # every 30 minutes
+  workflow_dispatch: # allows manual run
 
 jobs:
   mute:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -24,19 +25,27 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run script
+      - name: Run Strava mute script
         env:
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
         run: python mute_rides.py
 
-      - name: Save last_id.txt
+      - name: Commit updated last_id.txt
         run: |
           if [ -f last_id.txt ]; then
             git config --global user.name "github-actions"
             git config --global user.email "actions@github.com"
             git add last_id.txt
-            git commit -m "chore: update last processed ID" || echo "No new activities"
-            git push
+
+            # read commit message from file
+            COMMIT_MSG=$(cat commit_message.txt)
+            git commit -m "$COMMIT_MSG" || echo "No new activities to commit"
+
+            # ensure safe push
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+            git fetch origin main
+            git rebase origin/main
+            git push --force-with-lease
           fi
